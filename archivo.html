@@ -37,28 +37,13 @@
         font-size: 1.5em;
         cursor: pointer;
       }
-      /* Contenedor de canvas con posición relativa, dimensiones fijas según COLS y ROWS */
       #gameContainer {
         display: none;
-        position: relative;
-        width: 450px;  /* COLS (15) x BLOCK_SIZE (30) */
-        height: 900px; /* ROWS (30) x BLOCK_SIZE (30) */
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 20px;
       }
-      /* Canvas del juego por encima */
-      #gameCanvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 2;
-        border: 2px solid white;
-        background-color: #000;
-      }
-      /* Canvas de la imagen de fondo por debajo */
-      #imageCanvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 1;
+      canvas {
         border: 2px solid white;
         background-color: #000;
       }
@@ -75,9 +60,8 @@
       <button id="playButton">I Came Here to Kick Ass and Nuke Pieces!</button>
     </div>
     <div id="gameContainer">
-      <!-- El orden dentro del contenedor ya no importa, ya que usaremos z-index -->
-      <canvas id="imageCanvas"></canvas>
       <canvas id="gameCanvas"></canvas>
+      <canvas id="imageCanvas"></canvas>
     </div>
     <div id="timer"></div>
     <script>
@@ -96,11 +80,11 @@
         { shape: [[-1, 0], [0, 0], [1, 0], [1, -1]], color: "orange" },
         { shape: [[-1, 0], [0, 0], [1, 0], [-1, -1]], color: "blue" }
       ];
-
-      const gameCanvas = document.getElementById("gameCanvas");
-      const ctx = gameCanvas.getContext("2d");
-      gameCanvas.width = COLS * BLOCK_SIZE;
-      gameCanvas.height = ROWS * BLOCK_SIZE;
+      
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = COLS * BLOCK_SIZE;
+      canvas.height = ROWS * BLOCK_SIZE;
       
       const imageCanvas = document.getElementById("imageCanvas");
       const ctxImage = imageCanvas.getContext("2d");
@@ -250,7 +234,7 @@
         dropCounter += deltaTime;
         if (dropCounter > dropInterval) drop();
         
-        ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawBoard();
         drawPiece(currentPiece);
         drawCompletedImage();
@@ -275,16 +259,17 @@
       
       function startGame() {
         document.getElementById("startScreen").style.display = "none";
-        document.getElementById("gameContainer").style.display = "block";
+        document.getElementById("gameContainer").style.display = "flex";
         startTime = Date.now();
         fondo.src = "1.jpg";
         fondo.onload = () => {
           drawCompletedImage();
           update();
         };
-        let audio = new Audio("https://pablojose2.github.io/recursos2/duke.mp3");
-        audio.loop = true;
-        audio.play();
+     let audio = new Audio("https://pablojose2.github.io/recursos2/duke.mp3");
+audio.loop = true;
+audio.play();
+
       }
       
       document.getElementById("playButton").addEventListener("click", startGame);
