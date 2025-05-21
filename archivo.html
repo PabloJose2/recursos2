@@ -1,3 +1,293 @@
-let audio = new Audio("https://raw.githubusercontent.com/PabloJose2/recursos2/main/duke.mp3");
-audio.loop = true;
-audio.play();
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>BLOCK 'EM, BABY!</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: black;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      #startScreen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        z-index: 10;
+      }
+      #startScreen h1 {
+        color: white;
+        font-size: 2.5em;
+        margin-bottom: 20px;
+      }
+      #startScreen button {
+        padding: 10px 20px;
+        font-size: 1.5em;
+        cursor: pointer;
+      }
+      /* Contenedor de canvas con posición relativa, dimensiones fijas según COLS y ROWS */
+      #gameContainer {
+        display: none;
+        position: relative;
+        width: 450px;  /* COLS (15) x BLOCK_SIZE (30) */
+        height: 900px; /* ROWS (30) x BLOCK_SIZE (30) */
+      }
+      /* Canvas del juego por encima */
+      #gameCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 2;
+        border: 2px solid white;
+        background-color: #000;
+      }
+      /* Canvas de la imagen de fondo por debajo */
+      #imageCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        border: 2px solid white;
+        background-color: #000;
+      }
+      #timer {
+        color: white;
+        font-size: 1.5em;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="startScreen">
+      <h1>BLOCK 'EM, BABY!</h1>
+      <button id="playButton">I Came Here to Kick Ass and Nuke Pieces!</button>
+    </div>
+    <div id="gameContainer">
+      <!-- El orden dentro del contenedor ya no importa, ya que usaremos z-index -->
+      <canvas id="imageCanvas"></canvas>
+      <canvas id="gameCanvas"></canvas>
+    </div>
+    <div id="timer"></div>
+    <script>
+      "use strict";
+      const COLS = 15, ROWS = 30, BLOCK_SIZE = 30;
+      // Hemos cambiado el color negro "#000000" por "#808080" (gris) para que las fichas se destaquen sobre el fondo negro.
+      const COLOR_CYCLE = ["#a52a2a", "#808080", "#8b0000", "#b8860b", "#4b0082"];
+      let board = [];
+      for (let r = 0; r < ROWS; r++) board[r] = new Array(COLS).fill(0);
+      const tetrominoes = [
+        { shape: [[-1, 0], [0, 0], [1, 0], [2, 0]], color: "cyan" },
+        { shape: [[0, 0], [1, 0], [0, 1], [1, 1]], color: "yellow" },
+        { shape: [[-1, 0], [0, 0], [1, 0], [0, 1]], color: "purple" },
+        { shape: [[0, 0], [1, 0], [-1, 1], [0, 1]], color: "green" },
+        { shape: [[-1, 0], [0, 0], [0, 1], [1, 1]], color: "red" },
+        { shape: [[-1, 0], [0, 0], [1, 0], [1, -1]], color: "orange" },
+        { shape: [[-1, 0], [0, 0], [1, 0], [-1, -1]], color: "blue" }
+      ];
+
+      const gameCanvas = document.getElementById("gameCanvas");
+      const ctx = gameCanvas.getContext("2d");
+      gameCanvas.width = COLS * BLOCK_SIZE;
+      gameCanvas.height = ROWS * BLOCK_SIZE;
+      
+      const imageCanvas = document.getElementById("imageCanvas");
+      const ctxImage = imageCanvas.getContext("2d");
+      imageCanvas.width = COLS * BLOCK_SIZE;
+      imageCanvas.height = ROWS * BLOCK_SIZE;
+      
+      let fondo = new Image();
+      let revealedRows = 0;
+      let startTime = 0;
+      let dropInterval = 1000, dropCounter = 0, lastTime = 0;
+      let animationFrameId;
+      
+      function drawCell(x, y, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        ctx.strokeStyle = "black";
+        ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+      }
+      
+      function drawBoard() {
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (board[r][c] !== 0) drawCell(c, r, board[r][c]);
+            else {
+              ctx.fillStyle = "black";
+              ctx.fillRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+              ctx.strokeStyle = "gray";
+              ctx.strokeRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            }
+          }
+        }
+      }
+      
+      function drawPiece(piece) {
+        piece.shape.forEach(offset => {
+          const x = piece.x + offset[0],
+                y = piece.y + offset[1];
+          drawCell(x, y, piece.color);
+        });
+      }
+      
+      function newPiece() {
+        const index = Math.floor(Math.random() * tetrominoes.length);
+        const shape = tetrominoes[index].shape.map(c => [...c]);
+        return {
+          x: Math.floor(COLS / 2),
+          y: 0,
+          shape,
+          color: tetrominoes[index].color,
+          baseColor: tetrominoes[index].color
+        };
+      }
+      
+      function isValid(piece, board, offsetX = 0, offsetY = 0, newShape = null) {
+        const shape = newShape || piece.shape;
+        for (let i = 0; i < shape.length; i++) {
+          const x = piece.x + shape[i][0] + offsetX;
+          const y = piece.y + shape[i][1] + offsetY;
+          if (x < 0 || x >= COLS || y >= ROWS) return false;
+          if (y >= 0 && board[y][x] !== 0) return false;
+        }
+        return true;
+      }
+      
+      function rotate(piece) {
+        const newShape = piece.shape.map(coord => [-coord[1], coord[0]]);
+        if (isValid(piece, board, 0, 0, newShape)) piece.shape = newShape;
+      }
+      
+      function fixPiece(piece, board) {
+        const color = COLOR_CYCLE[Math.floor(Math.random() * COLOR_CYCLE.length)];
+        piece.shape.forEach(offset => {
+          const x = piece.x + offset[0],
+                y = piece.y + offset[1];
+          if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
+            board[y][x] = color;
+          }
+        });
+      }
+      
+      function clearLines() {
+        let linesCleared = 0;
+        for (let r = ROWS - 1; r >= 0; r--) {
+          if (board[r].every(cell => cell !== 0)) {
+            board.splice(r, 1);
+            board.unshift(new Array(COLS).fill(0));
+            linesCleared++;
+          }
+        }
+        if (linesCleared > 0) {
+          revealedRows += linesCleared;
+          if (revealedRows > ROWS) revealedRows = ROWS;
+          dropInterval *= Math.pow(0.975, linesCleared);
+          drawCompletedImage();
+          if (revealedRows >= ROWS) {
+            const endTime = Date.now();
+            const elapsed = ((endTime - startTime) / 1000).toFixed(2);
+            alert("¡Felicidades, has completado la imagen en " + elapsed + " segundos!");
+            document.removeEventListener("keydown", keydownHandler);
+            cancelAnimationFrame(animationFrameId);
+          }
+        }
+      }
+      
+      function drawCompletedImage() {
+        ctxImage.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+        const aspectRatio = fondo.width / fondo.height;
+        const canvasAspect = imageCanvas.width / imageCanvas.height;
+        let drawWidth, drawHeight;
+        if (aspectRatio > canvasAspect) {
+          drawWidth = imageCanvas.width;
+          drawHeight = drawWidth / aspectRatio;
+        } else {
+          drawHeight = imageCanvas.height;
+          drawWidth = drawHeight * aspectRatio;
+        }
+        const offsetX = (imageCanvas.width - drawWidth) / 2;
+        const offsetY = (imageCanvas.height - drawHeight) / 2;
+        ctxImage.drawImage(fondo, offsetX, offsetY, drawWidth, drawHeight);
+        
+        const coverHeight = drawHeight * (1 - (revealedRows / ROWS));
+        if (coverHeight > 0) {
+          ctxImage.fillStyle = "black";
+          ctxImage.fillRect(offsetX, offsetY, drawWidth, coverHeight);
+        }
+      }
+      
+      function drop() {
+        if (isValid(currentPiece, board, 0, 1))
+          currentPiece.y++;
+        else {
+          fixPiece(currentPiece, board);
+          clearLines();
+          currentPiece = newPiece();
+          if (!isValid(currentPiece, board)) {
+            alert("Game Over");
+            document.removeEventListener("keydown", keydownHandler);
+            cancelAnimationFrame(animationFrameId);
+          }
+        }
+        dropCounter = 0;
+      }
+      
+      function update(time = 0) {
+        const deltaTime = time - lastTime;
+        lastTime = time;
+        dropCounter += deltaTime;
+        if (dropCounter > dropInterval) drop();
+        
+        ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+        drawBoard();
+        drawPiece(currentPiece);
+        drawCompletedImage();
+        
+        document.getElementById("timer").innerText = "Tiempo: " + ((Date.now() - startTime) / 1000).toFixed(2) + " s";
+        animationFrameId = requestAnimationFrame(update);
+      }
+      
+      function keydownHandler(e) {
+        if (e.key === "ArrowLeft" && isValid(currentPiece, board, -1, 0))
+          currentPiece.x--;
+        else if (e.key === "ArrowRight" && isValid(currentPiece, board, 1, 0))
+          currentPiece.x++;
+        else if (e.key === "ArrowDown")
+          drop();
+        else if (e.key === "ArrowUp")
+          rotate(currentPiece);
+      }
+      
+      document.addEventListener("keydown", keydownHandler);
+      let currentPiece = newPiece();
+      
+      function startGame() {
+        document.getElementById("startScreen").style.display = "none";
+        document.getElementById("gameContainer").style.display = "block";
+        startTime = Date.now();
+        fondo.src = "1.jpg";
+        fondo.onload = () => {
+          drawCompletedImage();
+          update();
+        };
+        let audio = new Audio("https://pablojose2.github.io/recursos2/duke.mp3");
+        audio.loop = true;
+        audio.play();
+      }
+      
+      document.getElementById("playButton").addEventListener("click", startGame);
+    </script>
+  </body>
+</html>
