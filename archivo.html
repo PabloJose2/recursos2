@@ -4,27 +4,27 @@
     <meta charset="UTF-8" />
     <title>BLOCK 'EM, BABY!</title>
     <style>
-      body {
+      /* Elimina márgenes, padding y fuerza el tamaño completo en html y body */
+      html, body {
         margin: 0;
         padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
         background-color: black;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
       }
+      /* Pantalla de inicio que cubre toda la ventana */
       #startScreen {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
         background-color: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         z-index: 10;
       }
       #startScreen h1 {
@@ -37,20 +37,39 @@
         font-size: 1.5em;
         cursor: pointer;
       }
+      /* Contenedor del juego que ocupará toda la ventana */
       #gameContainer {
         display: none;
-        flex-direction: row;
-        align-items: flex-start;
-        gap: 20px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
       }
+      /* Los canvas se centran y se escalan para aprovechar el 100% de la altura */
       canvas {
         border: 2px solid white;
         background-color: #000;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        /* Se usa la altura completa del contenedor (viewport). */
+        height: 100%;
+        width: auto;
+        image-rendering: pixelated;
       }
+      /* Posicionamos el timer (opcional) en la parte inferior centrado */
       #timer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
         color: white;
         font-size: 1.5em;
-        margin-top: 20px;
+        margin: 0;
+        padding: 5px;
       }
     </style>
   </head>
@@ -67,10 +86,11 @@
     <script>
       "use strict";
       const COLS = 15, ROWS = 30, BLOCK_SIZE = 30;
-      // Hemos cambiado el color negro "#000000" por "#808080" (gris) para que las fichas se destaquen sobre el fondo negro.
       const COLOR_CYCLE = ["#a52a2a", "#808080", "#8b0000", "#b8860b", "#4b0082"];
       let board = [];
-      for (let r = 0; r < ROWS; r++) board[r] = new Array(COLS).fill(0);
+      for (let r = 0; r < ROWS; r++) 
+        board[r] = new Array(COLS).fill(0);
+      
       const tetrominoes = [
         { shape: [[-1, 0], [0, 0], [1, 0], [2, 0]], color: "cyan" },
         { shape: [[0, 0], [1, 0], [0, 1], [1, 1]], color: "yellow" },
@@ -81,11 +101,13 @@
         { shape: [[-1, 0], [0, 0], [1, 0], [-1, -1]], color: "blue" }
       ];
       
-      const canvas = document.getElementById("gameCanvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = COLS * BLOCK_SIZE;
-      canvas.height = ROWS * BLOCK_SIZE;
+      // Establece el lienzo de juego (canvas) con resolución fija
+      const gameCanvas = document.getElementById("gameCanvas");
+      const ctx = gameCanvas.getContext("2d");
+      gameCanvas.width = COLS * BLOCK_SIZE;
+      gameCanvas.height = ROWS * BLOCK_SIZE;
       
+      // Lienzo para la imagen de fondo
       const imageCanvas = document.getElementById("imageCanvas");
       const ctxImage = imageCanvas.getContext("2d");
       imageCanvas.width = COLS * BLOCK_SIZE;
@@ -107,7 +129,8 @@
       function drawBoard() {
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
-            if (board[r][c] !== 0) drawCell(c, r, board[r][c]);
+            if (board[r][c] !== 0) 
+              drawCell(c, r, board[r][c]);
             else {
               ctx.fillStyle = "black";
               ctx.fillRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
@@ -151,7 +174,8 @@
       
       function rotate(piece) {
         const newShape = piece.shape.map(coord => [-coord[1], coord[0]]);
-        if (isValid(piece, board, 0, 0, newShape)) piece.shape = newShape;
+        if (isValid(piece, board, 0, 0, newShape)) 
+          piece.shape = newShape;
       }
       
       function fixPiece(piece, board) {
@@ -234,12 +258,13 @@
         dropCounter += deltaTime;
         if (dropCounter > dropInterval) drop();
         
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
         drawBoard();
         drawPiece(currentPiece);
         drawCompletedImage();
         
-        document.getElementById("timer").innerText = "Tiempo: " + ((Date.now() - startTime) / 1000).toFixed(2) + " s";
+        document.getElementById("timer").innerText =
+          "Tiempo: " + ((Date.now() - startTime) / 1000).toFixed(2) + " s";
         animationFrameId = requestAnimationFrame(update);
       }
       
@@ -259,17 +284,17 @@
       
       function startGame() {
         document.getElementById("startScreen").style.display = "none";
-        document.getElementById("gameContainer").style.display = "flex";
+        document.getElementById("gameContainer").style.display = "block";
         startTime = Date.now();
         fondo.src = "1.jpg";
         fondo.onload = () => {
           drawCompletedImage();
           update();
         };
-     let audio = new Audio("https://pablojose2.github.io/recursos2/duke.mp3");
-audio.loop = true;
-audio.play();
-
+        // Carga y reproduce el audio
+        let audio = new Audio("https://pablojose2.github.io/recursos2/duke.mp3");
+        audio.loop = true;
+        audio.play();
       }
       
       document.getElementById("playButton").addEventListener("click", startGame);
