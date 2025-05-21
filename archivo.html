@@ -2,20 +2,20 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>BLOCK 'EM, BABY!</title>
+    <title>BLOCK 'EM, DUKE!</title>
     <style>
-      /* Elimina márgenes, padding y fuerza el tamaño completo en html y body */
+      /* Aseguramos que html y body ocupen el 100% de la ventana, sin márgenes */
       html, body {
         margin: 0;
         padding: 0;
         width: 100%;
         height: 100%;
-        overflow: hidden;
         background-color: black;
+        overflow: hidden;
       }
-      /* Pantalla de inicio que cubre toda la ventana */
+      /* Pantalla de inicio */
       #startScreen {
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
@@ -37,60 +37,61 @@
         font-size: 1.5em;
         cursor: pointer;
       }
-      /* Contenedor del juego que ocupará toda la ventana */
+      /* Contenedor del juego responsivo: ocupa la ventana completa y centra los canvas */
       #gameContainer {
-        display: none;
-        position: absolute;
+        display: none; /* Se muestra al iniciar el juego */
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
+        background-color: black;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
-      /* Los canvas se centran y se escalan para aprovechar el 100% de la altura */
+      /* Estilos de los canvas */
       canvas {
         border: 2px solid white;
         background-color: #000;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        /* Se usa la altura completa del contenedor (viewport). */
-        height: 100%;
-        width: auto;
-        image-rendering: pixelated;
+        /* La resolución interna se fija con JavaScript */
       }
-      /* Posicionamos el timer (opcional) en la parte inferior centrado */
+      /* Timer centrado en la parte inferior */
       #timer {
-        position: absolute;
+        position: fixed;
         bottom: 0;
-        left: 0;
         width: 100%;
         text-align: center;
         color: white;
         font-size: 1.5em;
-        margin: 0;
         padding: 5px;
+        margin: 0;
       }
     </style>
   </head>
   <body>
     <div id="startScreen">
-      <h1>BLOCK 'EM, BABY!</h1>
+      <h1>BLOCK 'EM, DUKE!</h1>
       <button id="playButton">I Came Here to Kick Ass and Nuke Pieces!</button>
     </div>
     <div id="gameContainer">
-      <canvas id="gameCanvas"></canvas>
       <canvas id="imageCanvas"></canvas>
+      <canvas id="gameCanvas"></canvas>
     </div>
     <div id="timer"></div>
     <script>
       "use strict";
       const COLS = 15, ROWS = 30, BLOCK_SIZE = 30;
+      // Resolución interna de cada canvas (ancho y alto fijos)
+      const INTERNAL_WIDTH = COLS * BLOCK_SIZE;   // 450px
+      const INTERNAL_HEIGHT = ROWS * BLOCK_SIZE;    // 900px
+
       const COLOR_CYCLE = ["#a52a2a", "#808080", "#8b0000", "#b8860b", "#4b0082"];
       let board = [];
-      for (let r = 0; r < ROWS; r++) 
+      for (let r = 0; r < ROWS; r++) {
         board[r] = new Array(COLS).fill(0);
-      
+      }
+
       const tetrominoes = [
         { shape: [[-1, 0], [0, 0], [1, 0], [2, 0]], color: "cyan" },
         { shape: [[0, 0], [1, 0], [0, 1], [1, 1]], color: "yellow" },
@@ -100,38 +101,38 @@
         { shape: [[-1, 0], [0, 0], [1, 0], [1, -1]], color: "orange" },
         { shape: [[-1, 0], [0, 0], [1, 0], [-1, -1]], color: "blue" }
       ];
-      
-      // Establece el lienzo de juego (canvas) con resolución fija
+
+      // Configuramos el canvas de juego (canvas de bloques)
       const gameCanvas = document.getElementById("gameCanvas");
       const ctx = gameCanvas.getContext("2d");
-      gameCanvas.width = COLS * BLOCK_SIZE;
-      gameCanvas.height = ROWS * BLOCK_SIZE;
-      
-      // Lienzo para la imagen de fondo
+      gameCanvas.width = INTERNAL_WIDTH;
+      gameCanvas.height = INTERNAL_HEIGHT;
+
+      // Configuramos el canvas para la imagen de fondo
       const imageCanvas = document.getElementById("imageCanvas");
       const ctxImage = imageCanvas.getContext("2d");
-      imageCanvas.width = COLS * BLOCK_SIZE;
-      imageCanvas.height = ROWS * BLOCK_SIZE;
-      
+      imageCanvas.width = INTERNAL_WIDTH;
+      imageCanvas.height = INTERNAL_HEIGHT;
+
       let fondo = new Image();
       let revealedRows = 0;
       let startTime = 0;
       let dropInterval = 1000, dropCounter = 0, lastTime = 0;
       let animationFrameId;
-      
+
       function drawCell(x, y, color) {
         ctx.fillStyle = color;
         ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
         ctx.strokeStyle = "black";
         ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
       }
-      
+
       function drawBoard() {
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
-            if (board[r][c] !== 0) 
+            if (board[r][c] !== 0) {
               drawCell(c, r, board[r][c]);
-            else {
+            } else {
               ctx.fillStyle = "black";
               ctx.fillRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
               ctx.strokeStyle = "gray";
@@ -140,7 +141,7 @@
           }
         }
       }
-      
+
       function drawPiece(piece) {
         piece.shape.forEach(offset => {
           const x = piece.x + offset[0],
@@ -148,7 +149,7 @@
           drawCell(x, y, piece.color);
         });
       }
-      
+
       function newPiece() {
         const index = Math.floor(Math.random() * tetrominoes.length);
         const shape = tetrominoes[index].shape.map(c => [...c]);
@@ -160,7 +161,7 @@
           baseColor: tetrominoes[index].color
         };
       }
-      
+
       function isValid(piece, board, offsetX = 0, offsetY = 0, newShape = null) {
         const shape = newShape || piece.shape;
         for (let i = 0; i < shape.length; i++) {
@@ -171,13 +172,13 @@
         }
         return true;
       }
-      
+
       function rotate(piece) {
         const newShape = piece.shape.map(coord => [-coord[1], coord[0]]);
-        if (isValid(piece, board, 0, 0, newShape)) 
+        if (isValid(piece, board, 0, 0, newShape))
           piece.shape = newShape;
       }
-      
+
       function fixPiece(piece, board) {
         const color = COLOR_CYCLE[Math.floor(Math.random() * COLOR_CYCLE.length)];
         piece.shape.forEach(offset => {
@@ -188,7 +189,7 @@
           }
         });
       }
-      
+
       function clearLines() {
         let linesCleared = 0;
         for (let r = ROWS - 1; r >= 0; r--) {
@@ -212,7 +213,7 @@
           }
         }
       }
-      
+
       function drawCompletedImage() {
         ctxImage.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
         const aspectRatio = fondo.width / fondo.height;
@@ -228,14 +229,14 @@
         const offsetX = (imageCanvas.width - drawWidth) / 2;
         const offsetY = (imageCanvas.height - drawHeight) / 2;
         ctxImage.drawImage(fondo, offsetX, offsetY, drawWidth, drawHeight);
-        
+
         const coverHeight = drawHeight * (1 - (revealedRows / ROWS));
         if (coverHeight > 0) {
           ctxImage.fillStyle = "black";
           ctxImage.fillRect(offsetX, offsetY, drawWidth, coverHeight);
         }
       }
-      
+
       function drop() {
         if (isValid(currentPiece, board, 0, 1))
           currentPiece.y++;
@@ -251,23 +252,23 @@
         }
         dropCounter = 0;
       }
-      
+
       function update(time = 0) {
         const deltaTime = time - lastTime;
         lastTime = time;
         dropCounter += deltaTime;
         if (dropCounter > dropInterval) drop();
-        
+
         ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
         drawBoard();
         drawPiece(currentPiece);
         drawCompletedImage();
-        
-        document.getElementById("timer").innerText =
+
+        document.getElementById("timer").innerText = 
           "Tiempo: " + ((Date.now() - startTime) / 1000).toFixed(2) + " s";
         animationFrameId = requestAnimationFrame(update);
       }
-      
+
       function keydownHandler(e) {
         if (e.key === "ArrowLeft" && isValid(currentPiece, board, -1, 0))
           currentPiece.x--;
@@ -278,15 +279,28 @@
         else if (e.key === "ArrowUp")
           rotate(currentPiece);
       }
-      
+
       document.addEventListener("keydown", keydownHandler);
       let currentPiece = newPiece();
-      
+
+      /* Función para actualizar la escala de los canvas */
+      function updateScale() {
+        // Calcula el factor de escala según el tamaño de la ventana y la resolución interna
+        const scale = Math.min(window.innerWidth / INTERNAL_WIDTH, window.innerHeight / INTERNAL_HEIGHT);
+        // Se aplica el mismo escalado a ambos canvas
+        gameCanvas.style.transform = "scale(" + scale + ")";
+        imageCanvas.style.transform = "scale(" + scale + ")";
+      }
+
+      // Actualiza la escala al iniciar y al redimensionar la ventana
+      window.addEventListener("resize", updateScale);
+      updateScale();
+
       function startGame() {
         document.getElementById("startScreen").style.display = "none";
-        document.getElementById("gameContainer").style.display = "block";
+        document.getElementById("gameContainer").style.display = "flex";
         startTime = Date.now();
-        fondo.src = "1.jpg";
+        fondo.src = "1.jpg";  // Asegúrate de que la imagen esté en el repositorio o en la ruta correcta
         fondo.onload = () => {
           drawCompletedImage();
           update();
@@ -296,7 +310,7 @@
         audio.loop = true;
         audio.play();
       }
-      
+
       document.getElementById("playButton").addEventListener("click", startGame);
     </script>
   </body>
